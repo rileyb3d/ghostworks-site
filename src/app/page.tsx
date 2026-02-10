@@ -1,6 +1,6 @@
 import { HeroReel } from "@/components/HeroReel";
 import { Marquee } from "@/components/Marquee";
-import { ProjectCard } from "@/components/ProjectCard";
+import { ProjectGrid } from "@/components/ProjectGrid";
 import { getAllProjects } from "@/lib/projects";
 
 export default function Home() {
@@ -10,31 +10,36 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
-      {/* Hero */}
-      <section className="relative overflow-hidden">
+      {/* Full-screen hero with video */}
+      <section className="relative">
         <HeroReel project={featured} />
       </section>
 
-      {/* Work grid */}
-      <section className="mx-auto max-w-7xl px-6 py-24 md:py-32">
-        <div className="mb-16 flex items-end justify-between border-b border-white/10 pb-6">
-          <h2 className="font-display text-sm font-medium uppercase tracking-[0.3em] text-zinc-500">
-            Selected Work
-          </h2>
-          <span className="hidden text-sm text-zinc-600 md:block">
-            {allProjects.length} projects
-          </span>
-        </div>
+      {/* Section divider */}
+      <SectionDivider label="Selected Work" count={allProjects.length} />
 
-        <div className="grid gap-x-10 gap-y-20 sm:grid-cols-2 lg:grid-cols-3">
-          {rest.map((project, index) => (
-            <ProjectCard key={project.slug} project={project} index={index} />
-          ))}
-        </div>
-      </section>
+      {/* Asymmetric project grid */}
+      <ProjectGrid projects={rest} />
 
       {/* Marquee */}
       <Marquee />
+    </div>
+  );
+}
+
+function SectionDivider({ label, count }: { label: string; count: number }) {
+  return (
+    <div className="mx-auto max-w-7xl px-8 pt-32 pb-16 lg:px-16">
+      <div className="flex items-end justify-between border-b border-white/[0.06] pb-8">
+        <div className="flex items-center gap-6">
+          <span className="font-display text-xs font-medium uppercase tracking-[0.4em] text-zinc-500">
+            {label}
+          </span>
+        </div>
+        <span className="hidden text-sm tabular-nums text-zinc-700 md:block">
+          ({String(count).padStart(2, "0")})
+        </span>
+      </div>
     </div>
   );
 }

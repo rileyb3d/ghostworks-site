@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Syne, DM_Sans } from "next/font/google";
 import { Header } from "@/components/Header";
+import { SmoothScroll } from "@/components/SmoothScroll";
+import { CustomCursor } from "@/components/CustomCursor";
+import { Preloader } from "@/components/Preloader";
 import "./globals.css";
 
 const syne = Syne({
@@ -28,12 +31,13 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${syne.variable} ${dmSans.variable} min-h-screen bg-black text-white antialiased`}
+        className={`${syne.variable} ${dmSans.variable} noise-overlay min-h-screen bg-[#050505] text-white antialiased`}
       >
-        <div className="pointer-events-none fixed inset-0 z-[100] bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(120,120,120,0.08),transparent)]" />
-        <div className="pointer-events-none fixed inset-0 z-[100] bg-[radial-gradient(ellipse_120%_80%_at_80%_100%,rgba(60,60,60,0.04),transparent)]" />
+        <SmoothScroll />
+        <CustomCursor />
+        <Preloader />
         <Header />
-        <main className="pt-20">{children}</main>
+        <main>{children}</main>
       </body>
     </html>
   );

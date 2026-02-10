@@ -3,17 +3,32 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRef, useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, useScroll, useTransform, useInView } from "framer-motion";
 import type { Project } from "@/lib/projects";
 
 type ProjectCardProps = {
   project: Project;
   index: number;
+  variant?: "large" | "default";
 };
 
-export function ProjectCard({ project, index }: ProjectCardProps) {
+export function ProjectCard({
+  project,
+  index,
+  variant = "default",
+}: ProjectCardProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isHovered, setIsHovered] = useState(false);
+  const isInView = useInView(cardRef, { once: true, margin: "-100px" });
+
+  const { scrollYProgress } = useScroll({
+    target: imageContainerRef,
+    offset: ["start end", "end start"],
+  });
+
+  const imageY = useTransform(scrollYProgress, [0, 1], [-30, 30]);
 
   useEffect(() => {
     if (!videoRef.current) return;
@@ -21,18 +36,21 @@ export function ProjectCard({ project, index }: ProjectCardProps) {
       videoRef.current.play().catch(() => {});
     } else {
       videoRef.current.pause();
+      videoRef.current.currentTime = 0;
     }
   }, [isHovered]);
 
+  const isLarge = variant === "large";
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 60 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-80px" }}
+      ref={cardRef}
+      initial={{ opacity: 0, y: 80 }}
+      animate={isInView ? { opacity: 1, y: 0 } : {}}
       transition={{
-        duration: 0.6,
-        delay: index * 0.1,
-        ease: [0.25, 0.46, 0.45, 0.94],
+        duration: 0.8,
+        delay: index * 0.15,
+        ease: [0.76, 0, 0.24, 1],
       }}
     >
       <Link
@@ -40,11 +58,35 @@ export function ProjectCard({ project, index }: ProjectCardProps) {
         className="group block"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        data-cursor="view"
+        data-cursor-text="View"
       >
-        <article className="overflow-hidden">
-          <div className="relative aspect-[4/3] overflow-hidden bg-zinc-900">
-            {project.videoUrl ? (
-              <>
+        <article>
+          {/* Image container with parallax */}
+          <div
+            ref={imageContainerRef}
+            className={`relative overflow-hidden bg-zinc-950 ${
+              isLarge ? "aspect-[16/10]" : "aspect-[4/3]"
+            }`}
+          >
+            <motion.div
+              className="absolute -inset-8"
+              style={{ y: imageY }}
+            >
+              <Image
+                src={project.thumbnailUrl}
+                alt={project.title}
+                fill
+                sizes={
+                  isLarge
+                    ? "(max-width: 768px) 100vw, 66vw"
+                    : "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                }
+                className={`object-cover transition-all duration-700 ${
+                  isHovered ? "scale-105 opacity-0" : "scale-100 opacity-100"
+                }`}
+              />
+              {project.videoUrl && (
                 <video
                   ref={videoRef}
                   src={project.videoUrl}
@@ -52,36 +94,46 @@ export function ProjectCard({ project, index }: ProjectCardProps) {
                   loop
                   playsInline
                   poster={project.thumbnailUrl}
-                  className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                  className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${
+                    isHovered ? "opacity-100" : "opacity-0"
+                  }`}
                 />
-                <Image
-                  src={project.thumbnailUrl}
-                  alt={project.title}
-                  fill
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                  className="object-cover transition-all duration-500 group-hover:scale-[1.03] group-hover:opacity-0"
-                />
-              </>
-            ) : (
-              <Image
-                src={project.thumbnailUrl}
-                alt={project.title}
-                fill
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-              />
-            )}
-            <div className="absolute inset-0 bg-black/0 transition-colors duration-300 group-hover:bg-black/10" />
+              )}
+            </motion.div>
+
+            {/* Hover overlay */}
+            <div
+              className={`absolute inset-0 bg-black/0 transition-all duration-500 ${
+                isHovered ? "bg-black/20" : ""
+              }`}
+            />
           </div>
-          <div className="mt-5 flex items-baseline justify-between gap-4">
-            <h2 className="font-display text-xl font-medium tracking-tight text-white transition-colors group-hover:text-white/90 md:text-2xl">
-              {project.title}
-            </h2>
-            <span className="shrink-0 text-sm text-zinc-500">{project.year}</span>
+
+          {/* Info */}
+          <div className="mt-6 flex items-start justify-between gap-4">
+            <div>
+              <h2
+                className={`font-display font-semibold tracking-tight text-white ${
+                  isLarge ? "text-2xl md:text-3xl" : "text-lg md:text-xl"
+                }`}
+              >
+                <span className="relative">
+                  {project.title}
+                  <span
+                    className={`absolute -bottom-1 left-0 h-px bg-white transition-all duration-500 ${
+                      isHovered ? "w-full" : "w-0"
+                    }`}
+                  />
+                </span>
+              </h2>
+              {project.client && (
+                <p className="mt-1.5 text-sm text-zinc-600">{project.client}</p>
+              )}
+            </div>
+            <span className="mt-1 shrink-0 text-sm tabular-nums text-zinc-600">
+              {project.year}
+            </span>
           </div>
-          {project.client && (
-            <p className="mt-1 text-sm text-zinc-500">{project.client}</p>
-          )}
         </article>
       </Link>
     </motion.div>
