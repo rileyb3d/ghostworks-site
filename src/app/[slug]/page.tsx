@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { VideoPlayer } from "@/components/VideoPlayer";
+import { ProjectFooter } from "@/components/ProjectFooter";
 import { getProject, getAllProjects } from "@/lib/projects";
 
 type Props = {
@@ -22,35 +23,41 @@ export default async function ProjectPage({ params }: Props) {
 
   return (
     <div className="min-h-screen">
-      <article className="mx-auto max-w-5xl px-6 py-16 md:py-24">
+      <article className="relative">
         <Link
           href="/"
-          className="mb-12 inline-block text-sm text-zinc-500 transition-colors hover:text-white"
+          className="fixed left-6 top-28 z-50 text-sm tracking-wide text-zinc-500 transition-colors hover:text-white"
         >
-          ← Back to Work
+          ← Back
         </Link>
 
-        <div className="mb-12">
-          <h1 className="text-3xl font-medium tracking-tight md:text-4xl">
-            {project.title}
-          </h1>
-          <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-sm text-zinc-500">
-            <span>{project.year}</span>
-            {project.client && <span>{project.client}</span>}
-          </div>
-        </div>
-
-        <div className="overflow-hidden rounded-sm">
+        {/* Full-bleed video */}
+        <div className="relative w-full">
           <VideoPlayer
             src={project.videoUrl}
             poster={project.thumbnailUrl}
-            className="w-full"
+            className="aspect-video w-full md:aspect-[21/9]"
           />
         </div>
 
-        {project.description && (
-          <p className="mt-12 max-w-2xl text-zinc-400">{project.description}</p>
-        )}
+        {/* Project info */}
+        <div className="mx-auto max-w-3xl px-6 py-16 md:py-24">
+          <h1 className="font-display text-4xl font-semibold tracking-tight text-white md:text-5xl">
+            {project.title}
+          </h1>
+          <div className="mt-4 flex flex-wrap gap-x-8 gap-y-1 text-sm text-zinc-500">
+            <span>{project.year}</span>
+            {project.client && <span>{project.client}</span>}
+          </div>
+
+          {project.description && (
+            <p className="mt-12 text-lg leading-relaxed text-zinc-400">
+              {project.description}
+            </p>
+          )}
+        </div>
+
+        <ProjectFooter currentSlug={slug} />
       </article>
     </div>
   );

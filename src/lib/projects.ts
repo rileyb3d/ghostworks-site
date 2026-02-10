@@ -6,12 +6,14 @@ export type Project = {
   videoUrl: string;
   thumbnailUrl: string;
   description?: string;
+  featured?: boolean;
 };
 
 export const projects: Project[] = [
   {
     slug: "sample-project",
     title: "Sample Project",
+    featured: true,
     year: "2025",
     client: "Client Name",
     videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4",

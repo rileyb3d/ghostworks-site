@@ -10,6 +10,7 @@ To add a new project to the Ghostworks portfolio:
   slug: "my-project",           // URL path, use lowercase + hyphens
   title: "Project Title",
   year: "2025",
+  featured: true,               // optional - shows in hero
   client: "Client Name",        // optional
   videoUrl: "https://...",      // YouTube, Vimeo, or direct .mp4 URL
   thumbnailUrl: "https://...",  // or "/images/my-thumb.jpg" for local
