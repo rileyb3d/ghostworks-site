@@ -26,7 +26,9 @@ async function loadBilling(customerId: string): Promise<{
       customer: customerId,
       status: "all",
       limit: 20,
-      expand: ["data.items.data.price.product"],
+      // Stripe caps expand at 4 levels. Price is included by default; the
+      // product name falls back to a generic label in SubscriptionsList.
+      expand: ["data.items.data.price"],
     }),
   ]);
   return {
