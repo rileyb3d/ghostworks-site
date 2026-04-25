@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
 import { isCurrentUserAdmin } from "@/lib/admin";
 
-// Admin-only: cancel an invoice. Stripe rules:
-//   - draft         -> permanently deletable
+// Admin-only: remove an invoice. Stripe rules:
+//   - draft         -> permanently deletable via API
 //   - open / uncollectible -> can only be voided (kept on record, cancelled)
-//   - paid          -> cannot be deleted or voided; admin must refund the
-//                      payment from the Stripe dashboard
+//   - paid          -> Stripe forbids delete/void; we mark metadata.archived
+//                      and filter those out of every list. The actual Stripe
+//                      record stays for accounting, refunds happen via the
+//                      Stripe dashboard if needed.
 //   - void          -> already gone, noop
 //
 // We pick the right action based on current status and return what we did
@@ -48,14 +50,20 @@ export async function DELETE(
           { error: "Invoice is already void." },
           { status: 400 },
         );
-      case "paid":
-        return NextResponse.json(
-          {
-            error:
-              "Paid invoices can't be deleted. Refund the payment in the Stripe dashboard instead.",
+      case "paid": {
+        const updated = await stripe.invoices.update(id, {
+          metadata: {
+            ...(invoice.metadata ?? {}),
+            archived: "true",
+            archivedAt: new Date().toISOString(),
           },
-          { status: 400 },
-        );
+        });
+        return NextResponse.json({
+          ok: true,
+          action: "archived",
+          status: updated.status,
+        });
+      }
       default:
         return NextResponse.json(
           { error: `Unsupported invoice status: ${invoice.status ?? "unknown"}` },

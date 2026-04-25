@@ -32,7 +32,9 @@ async function loadBilling(customerId: string): Promise<{
     }),
   ]);
   return {
-    invoices: invoices.data,
+    // Skip invoices admins archived. Stripe still has them on file, but we
+    // don't show them to the customer.
+    invoices: invoices.data.filter((inv) => inv.metadata?.archived !== "true"),
     subscriptions: subscriptions.data,
   };
 }

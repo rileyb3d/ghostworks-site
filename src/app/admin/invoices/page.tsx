@@ -82,7 +82,13 @@ export default async function AdminInvoicesPage() {
     loadStripeData(),
   ]);
 
-  const stats = computeStats(stripeData.invoices, stripeData.subscriptions);
+  // Hide invoices admins have archived. Stripe still keeps them on record;
+  // we just don't surface them in the dashboard or in customer /account.
+  const visibleInvoices = stripeData.invoices.filter(
+    (inv) => inv.metadata?.archived !== "true",
+  );
+
+  const stats = computeStats(visibleInvoices, stripeData.subscriptions);
 
   return (
     <div className="mx-auto max-w-6xl px-8 pt-32 pb-24 lg:px-16">
@@ -138,9 +144,9 @@ export default async function AdminInvoicesPage() {
 
       <Section
         label="All invoices"
-        hint="Most recent first. Click Open to view the hosted invoice."
+        hint="Most recent first. Click Open to view the hosted invoice. Archive a paid invoice to hide it from this list."
       >
-        <InvoicesTable invoices={stripeData.invoices} />
+        <InvoicesTable invoices={visibleInvoices} />
       </Section>
 
       <Section

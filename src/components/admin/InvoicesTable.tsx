@@ -35,7 +35,9 @@ export function InvoicesTable({ invoices }: Props) {
     const verb =
       invoice.status === "draft"
         ? "delete this draft invoice"
-        : "void this invoice (cannot be undone)";
+        : invoice.status === "paid"
+          ? "archive this paid invoice (hides it from all lists; the Stripe record stays for accounting)"
+          : "void this invoice (cannot be undone)";
     if (!window.confirm(`Are you sure you want to ${verb}?`)) return;
 
     setError(null);
@@ -111,8 +113,14 @@ export function InvoicesTable({ invoices }: Props) {
               const canRemove =
                 status === "draft" ||
                 status === "open" ||
-                status === "uncollectible";
-              const removeLabel = status === "draft" ? "Delete" : "Void";
+                status === "uncollectible" ||
+                status === "paid";
+              const removeLabel =
+                status === "draft"
+                  ? "Delete"
+                  : status === "paid"
+                    ? "Archive"
+                    : "Void";
               const isBusy = busyId === inv.id || pending;
 
               return (
