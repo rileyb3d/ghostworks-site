@@ -1,0 +1,47 @@
+---
+description: Auto-commit and deploy code changes to production by default
+alwaysApply: true
+---
+
+# Auto-Deploy Workflow
+
+After making code changes that the user has accepted, **deploy by default** unless the user says otherwise (e.g. "don't deploy", "wait", "stage only", "I'll commit myself").
+
+## Deploy Mechanism
+
+This project deploys to Vercel automatically when commits land on `master`. To deploy:
+
+1. Stage the changes you made: `git add -A` (or specific paths).
+2. Commit with a concise, conventional message (no need to ask the user to approve it first):
+   ```bash
+   git commit -m "$(cat <<'EOF'
+   short summary of what changed and why
+   EOF
+   )"
+   ```
+3. Push: `git push origin master`.
+4. Confirm to the user with the commit SHA and a one-line summary so they know it's live.
+
+## Commit Message Style
+
+- Imperative, lowercase, ~60 chars or less for the subject.
+- Focus on the *why*, not a file-by-file diff.
+- Examples: `simplify contact page to single email link`, `remove placeholder projects from home`, `add billing item to account dropdown`.
+
+## When NOT to Deploy
+
+Skip the deploy and just leave changes staged/uncommitted when:
+
+- The user explicitly says don't deploy, hold off, let me review, etc.
+- Changes are clearly WIP (broken build, failing types, TODOs the user flagged).
+- The change touches secrets, `.env*`, or anything that looks unsafe to ship.
+- You introduced lint/type errors you couldn't fix — surface them instead of shipping.
+- The user is mid-conversation iterating; deploy after the iteration settles, not on every micro-edit.
+
+## Safety
+
+- Never force-push to `master`.
+- Never `--amend` a commit that's already been pushed.
+- Don't bypass hooks (`--no-verify`).
+- If a pre-commit / pre-push hook fails, fix the issue and create a *new* commit.
+- If `git push` is rejected (non-fast-forward), pull/rebase first and tell the user before re-pushing.
