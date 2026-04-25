@@ -77,6 +77,10 @@ export async function POST(req: Request) {
       description,
     });
 
+    // Recent Stripe API versions don't auto-attach pending invoice items to
+    // new invoices — without `pending_invoice_items_behavior: "include"` the
+    // invoice gets finalized at $0 and the item is left orphaned on the
+    // customer.
     const collectionMethod: Stripe.InvoiceCreateParams.CollectionMethod =
       "send_invoice";
     let invoice = await stripe.invoices.create({
@@ -85,6 +89,7 @@ export async function POST(req: Request) {
       days_until_due: daysUntilDue,
       description,
       auto_advance: false,
+      pending_invoice_items_behavior: "include",
     });
 
     invoice = await stripe.invoices.finalizeInvoice(invoice.id as string);
