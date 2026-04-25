@@ -41,22 +41,3 @@ body {
   background: rgba(255, 255, 255, 0.2);
   color: #ffffff;
 }
-
-/* Marquee text styles */
-.text-stroke {
-  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.18);
-  -webkit-text-fill-color: transparent;
-}
-
-/* Marquee scroll animation */
-@keyframes scroll-left {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-.animate-scroll-left {
-  animation: scroll-left 60s linear infinite;
-}

@@ -49,14 +49,6 @@ export function Header() {
           </Link>
           <nav className="flex items-center gap-8">
             <Link
-              href="/"
-              className="group relative text-sm tracking-wider text-zinc-400 transition-colors hover:text-white"
-              data-cursor="pointer"
-            >
-              Work
-              <span className="absolute -bottom-1 left-0 h-px w-0 bg-white transition-all duration-300 group-hover:w-full" />
-            </Link>
-            <Link
               href="/contact"
               className="group relative text-sm tracking-wider text-zinc-400 transition-colors hover:text-white"
               data-cursor="pointer"

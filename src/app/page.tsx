@@ -1,42 +1,55 @@
-import { HeroReel } from "@/components/HeroReel";
-import { HeroPlaceholder } from "@/components/HeroPlaceholder";
-import { Marquee } from "@/components/Marquee";
-import { ProjectGrid } from "@/components/ProjectGrid";
-import { getAllProjects } from "@/lib/projects";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { auth } from "@clerk/nextjs/server";
 
-export default function Home() {
-  const allProjects = getAllProjects();
-  const featured = allProjects.find((p) => p.featured) ?? allProjects[0];
-  const rest = featured
-    ? allProjects.filter((p) => p.slug !== featured.slug)
-    : [];
+export default async function Home() {
+  const { userId } = await auth();
+  if (userId) {
+    redirect("/account");
+  }
 
   return (
-    <div className="min-h-screen">
-      {featured ? <HeroReel project={featured} /> : <HeroPlaceholder />}
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-8 lg:px-16">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.05),_transparent_60%)]" />
 
-      {allProjects.length > 0 && (
-        <>
-          <SectionDivider label="Selected Work" count={allProjects.length} />
-          <ProjectGrid projects={rest} />
-        </>
-      )}
+      <div className="relative z-10 mx-auto flex max-w-2xl flex-col items-center text-center">
+        <p className="font-display text-xs font-medium uppercase tracking-[0.4em] text-zinc-500">
+          Ghostworks
+        </p>
+        <h1 className="mt-6 font-display text-5xl font-semibold tracking-tight md:text-6xl">
+          Client portal.
+        </h1>
+        <p className="mt-5 max-w-md text-sm text-zinc-400 md:text-base">
+          Sign in to view invoices, manage retainers, and pay securely.
+        </p>
 
-      <Marquee />
-    </div>
-  );
-}
+        <div className="mt-12 flex flex-col items-stretch gap-4 sm:flex-row sm:items-center">
+          <Link
+            href="/sign-in"
+            data-cursor="pointer"
+            className="rounded-full bg-white px-8 py-3 text-center font-display text-sm font-medium uppercase tracking-[0.2em] text-black transition-colors hover:bg-zinc-200"
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/sign-up"
+            data-cursor="pointer"
+            className="rounded-full border border-white/20 px-8 py-3 text-center font-display text-sm font-medium uppercase tracking-[0.2em] text-white transition-colors hover:bg-white hover:text-black"
+          >
+            Create account
+          </Link>
+        </div>
 
-function SectionDivider({ label, count }: { label: string; count: number }) {
-  return (
-    <div className="mx-auto max-w-7xl px-8 pt-28 pb-12 lg:px-16">
-      <div className="flex items-end justify-between border-b border-white/[0.06] pb-6">
-        <span className="font-display text-xs font-medium uppercase tracking-[0.4em] text-zinc-500">
-          {label}
-        </span>
-        <span className="text-sm tabular-nums text-zinc-600">
-          ({String(count).padStart(2, "0")})
-        </span>
+        <p className="mt-10 text-xs text-zinc-600">
+          Need to reach us?{" "}
+          <Link
+            href="/contact"
+            className="text-zinc-400 underline-offset-4 transition-colors hover:text-white hover:underline"
+          >
+            Get in touch
+          </Link>
+          .
+        </p>
       </div>
     </div>
   );
