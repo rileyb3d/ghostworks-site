@@ -1,4 +1,5 @@
 import { HeroReel } from "@/components/HeroReel";
+import { HeroPlaceholder } from "@/components/HeroPlaceholder";
 import { Marquee } from "@/components/Marquee";
 import { ProjectGrid } from "@/components/ProjectGrid";
 import { getAllProjects } from "@/lib/projects";
@@ -6,15 +7,20 @@ import { getAllProjects } from "@/lib/projects";
 export default function Home() {
   const allProjects = getAllProjects();
   const featured = allProjects.find((p) => p.featured) ?? allProjects[0];
-  const rest = allProjects.filter((p) => p.slug !== featured.slug);
+  const rest = featured
+    ? allProjects.filter((p) => p.slug !== featured.slug)
+    : [];
 
   return (
     <div className="min-h-screen">
-      <HeroReel project={featured} />
+      {featured ? <HeroReel project={featured} /> : <HeroPlaceholder />}
 
-      <SectionDivider label="Selected Work" count={allProjects.length} />
-
-      <ProjectGrid projects={rest} />
+      {allProjects.length > 0 && (
+        <>
+          <SectionDivider label="Selected Work" count={allProjects.length} />
+          <ProjectGrid projects={rest} />
+        </>
+      )}
 
       <Marquee />
     </div>
