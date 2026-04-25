@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { getStripe } from "@/lib/stripe";
+import { getOrCreateStripeCustomerId } from "@/lib/stripe-customer";
 
 // Public endpoint that turns a client-supplied amount + description into a
 // Stripe Checkout Session for one-off client invoice payments. Returns the
@@ -52,12 +54,26 @@ export async function POST(req: Request) {
     req.headers.get("origin") ??
     "http://localhost:3000";
 
+  // If the visitor is signed in, attach the checkout to their Stripe customer
+  // so the payment shows up in /account afterwards. Otherwise fall back to a
+  // guest checkout keyed off email.
+  const { userId } = await auth();
+  let customerId: string | undefined;
+  if (userId) {
+    try {
+      customerId = await getOrCreateStripeCustomerId(userId);
+    } catch (err) {
+      console.error("Failed to resolve Stripe customer for signed-in user", err);
+    }
+  }
+
   try {
     const stripe = getStripe();
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
-      customer_email: email || undefined,
+      customer: customerId,
+      customer_email: customerId ? undefined : email || undefined,
       line_items: [
         {
           quantity: 1,
@@ -74,6 +90,7 @@ export async function POST(req: Request) {
       metadata: {
         reference: reference ?? "",
         kind: "client_invoice",
+        clerkUserId: userId ?? "",
       },
       success_url: `${origin}/pay/thanks?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/pay`,

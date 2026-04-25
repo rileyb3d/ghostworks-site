@@ -75,7 +75,17 @@ export function Header() {
               </Link>
             ) : null}
             {isLoaded && isSignedIn ? (
-              <UserButton appearance={{ variables: { colorPrimary: "#ffffff" } }} />
+              <>
+                <Link
+                  href="/account"
+                  className="group relative text-sm tracking-wider text-zinc-400 transition-colors hover:text-white"
+                  data-cursor="pointer"
+                >
+                  Account
+                  <span className="absolute -bottom-1 left-0 h-px w-0 bg-white transition-all duration-300 group-hover:w-full" />
+                </Link>
+                <UserButton appearance={{ variables: { colorPrimary: "#ffffff" } }} />
+              </>
             ) : null}
           </nav>
         </div>
