@@ -84,12 +84,40 @@ export function Header() {
                   Account
                   <span className="absolute -bottom-1 left-0 h-px w-0 bg-white transition-all duration-300 group-hover:w-full" />
                 </Link>
-                <UserButton />
+                <UserButton>
+                  <UserButton.MenuItems>
+                    <UserButton.Link
+                      label="Billing"
+                      labelIcon={<BillingIcon />}
+                      href="/account"
+                    />
+                  </UserButton.MenuItems>
+                </UserButton>
               </>
             ) : null}
           </nav>
         </div>
       </div>
     </motion.header>
+  );
+}
+
+function BillingIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M2 10h20" />
+      <path d="M6 15h4" />
+    </svg>
   );
 }
