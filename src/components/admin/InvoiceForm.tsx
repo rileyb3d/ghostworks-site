@@ -48,11 +48,14 @@ export function InvoiceForm({ knownEmails }: { knownEmails: string[] }) {
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    // Capture the form element synchronously — React nulls out e.currentTarget
+    // after awaits, so we'd hit "reading 'reset'" on a null otherwise.
+    const formEl = e.currentTarget;
     setStatus("submitting");
     setError(null);
     setResult(null);
 
-    const form = new FormData(e.currentTarget);
+    const form = new FormData(formEl);
 
     if (mode === "invoice") {
       const payload = {
@@ -88,7 +91,7 @@ export function InvoiceForm({ knownEmails }: { knownEmails: string[] }) {
           invoicePdf: data.invoicePdf ?? null,
           sent: !!data.sent,
         });
-        e.currentTarget.reset();
+        formEl.reset();
       } catch (err) {
         setStatus("error");
         setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -131,7 +134,7 @@ export function InvoiceForm({ knownEmails }: { knownEmails: string[] }) {
         emailSent: !!data.emailSent,
         emailError: data.emailError ?? null,
       });
-      e.currentTarget.reset();
+      formEl.reset();
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : "Something went wrong.");
