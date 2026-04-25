@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
+import { Resend } from "resend";
 import { getStripe } from "@/lib/stripe";
 import { isCurrentUserAdmin } from "@/lib/admin";
 
-// Admin-only endpoint to start a recurring subscription for a customer.
-// Uses send_invoice collection so the customer receives an emailed hosted
-// invoice each cycle (no card on file required up front). Inline price_data
-// keeps us from having to manage Products / Prices in the dashboard.
+// Admin-only endpoint to start a recurring subscription that auto-charges a
+// saved card every cycle. We don't create the Subscription directly because
+// that requires a payment method on file. Instead we create a Checkout
+// Session in `mode: "subscription"` — the customer enters card details on
+// Stripe's hosted page, and from then on Stripe auto-charges that card on
+// the configured cadence. Failed payments retry automatically per Stripe's
+// dunning settings, and the customer can update the card or cancel via the
+// existing Manage Billing portal on /account.
 
 type Body = {
   email?: string;
@@ -15,7 +20,6 @@ type Body = {
   description?: string;
   interval?: "day" | "week" | "month" | "year";
   intervalCount?: number;
-  daysUntilDue?: number;
 };
 
 const MIN_USD = 1;
@@ -26,6 +30,66 @@ const ALLOWED_INTERVALS: ReadonlyArray<"day" | "week" | "month" | "year"> = [
   "month",
   "year",
 ];
+
+function intervalSummary(
+  interval: "day" | "week" | "month" | "year",
+  intervalCount: number,
+): string {
+  if (intervalCount === 1) return `every ${interval}`;
+  return `every ${intervalCount} ${interval}s`;
+}
+
+async function emailSetupLink(args: {
+  to: string;
+  name?: string;
+  description: string;
+  amount: number;
+  intervalSummary: string;
+  url: string;
+}): Promise<{ sent: boolean; error?: string }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.CONTACT_FROM_EMAIL;
+  if (!apiKey || !from) {
+    return {
+      sent: false,
+      error: "Resend / from-email not configured (RESEND_API_KEY, CONTACT_FROM_EMAIL)",
+    };
+  }
+
+  const formattedAmount = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(args.amount);
+
+  const greeting = args.name ? `Hi ${args.name},` : "Hi,";
+  const subject = `Set up your ${args.description} subscription`;
+  const text = [
+    greeting,
+    "",
+    `You've been invited to start a recurring payment for: ${args.description}.`,
+    `Amount: ${formattedAmount} ${args.intervalSummary}.`,
+    "",
+    "Click the link below to enter your card details. Your card will then be charged automatically each cycle. You can update your card or cancel anytime from your account.",
+    "",
+    args.url,
+    "",
+    "— Ghostworks",
+  ].join("\n");
+
+  const resend = new Resend(apiKey);
+  const { error } = await resend.emails.send({
+    from,
+    to: [args.to],
+    subject,
+    text,
+  });
+
+  if (error) {
+    console.error("Resend send failed", error);
+    return { sent: false, error: "Failed to email setup link." };
+  }
+  return { sent: true };
+}
 
 export async function POST(req: Request) {
   if (!(await isCurrentUserAdmin())) {
@@ -47,9 +111,6 @@ export async function POST(req: Request) {
   const intervalCount = Number.isFinite(body.intervalCount)
     ? Math.max(1, Math.min(52, Number(body.intervalCount)))
     : 1;
-  const daysUntilDue = Number.isFinite(body.daysUntilDue)
-    ? Math.max(0, Math.min(365, Number(body.daysUntilDue)))
-    : 14;
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: "Valid email is required." }, { status: 400 });
@@ -67,6 +128,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid billing interval." }, { status: 400 });
   }
 
+  const origin =
+    process.env.NEXT_PUBLIC_APP_URL ??
+    req.headers.get("origin") ??
+    "http://localhost:3000";
+
   try {
     const stripe = getStripe();
 
@@ -81,45 +147,52 @@ export async function POST(req: Request) {
       customer = await stripe.customers.create({ email, name });
     }
 
-    // Stripe subscriptions require an existing Product to hang the Price on
-    // (unlike one-off Checkout where product_data can be inline). Create a
-    // fresh Product per subscription so the description shows up cleanly on
-    // invoices and in the Stripe dashboard.
-    const product = await stripe.products.create({
-      name: description,
-      metadata: { kind: "admin_subscription", clerkAdmin: "true" },
-    });
-
-    const subscription = await stripe.subscriptions.create({
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
       customer: customer.id,
-      collection_method: "send_invoice",
-      days_until_due: daysUntilDue,
-      description,
-      items: [
+      payment_method_types: ["card"],
+      line_items: [
         {
+          quantity: 1,
           price_data: {
             currency: "usd",
+            product_data: { name: description },
             unit_amount: Math.round(amount * 100),
-            product: product.id,
             recurring: { interval, interval_count: intervalCount },
           },
         },
       ],
-      expand: ["latest_invoice"],
+      metadata: {
+        kind: "admin_subscription",
+        description,
+      },
+      success_url: `${origin}/pay/thanks?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/pay`,
     });
 
-    const latestInvoice =
-      typeof subscription.latest_invoice === "object" && subscription.latest_invoice
-        ? subscription.latest_invoice
-        : null;
+    if (!session.url) {
+      return NextResponse.json(
+        { error: "Stripe did not return a Checkout URL." },
+        { status: 502 },
+      );
+    }
+
+    const emailResult = await emailSetupLink({
+      to: email,
+      name,
+      description,
+      amount,
+      intervalSummary: intervalSummary(interval, intervalCount),
+      url: session.url,
+    });
 
     return NextResponse.json({
       ok: true,
-      subscriptionId: subscription.id,
+      checkoutSessionId: session.id,
+      checkoutUrl: session.url,
       customerId: customer.id,
-      firstInvoiceId: latestInvoice?.id ?? null,
-      firstInvoiceHostedUrl: latestInvoice?.hosted_invoice_url ?? null,
-      firstInvoicePdf: latestInvoice?.invoice_pdf ?? null,
+      emailSent: emailResult.sent,
+      emailError: emailResult.error ?? null,
     });
   } catch (err) {
     console.error("Admin subscription create failed", err);

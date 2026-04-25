@@ -5,13 +5,21 @@ import { useState } from "react";
 type Status = "idle" | "submitting" | "success" | "error";
 type Mode = "invoice" | "subscription";
 
-type Result = {
-  kind: Mode;
-  id: string;
-  hostedInvoiceUrl?: string | null;
-  invoicePdf?: string | null;
-  sent: boolean;
-};
+type Result =
+  | {
+      kind: "invoice";
+      id: string;
+      hostedInvoiceUrl?: string | null;
+      invoicePdf?: string | null;
+      sent: boolean;
+    }
+  | {
+      kind: "subscription";
+      id: string;
+      checkoutUrl: string;
+      emailSent: boolean;
+      emailError?: string | null;
+    };
 
 const inputClass =
   "w-full rounded-md border border-white/15 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder:text-zinc-500 outline-none transition-colors focus:border-white/50 focus:bg-white/[0.06]";
@@ -97,7 +105,6 @@ export function InvoiceForm({ knownEmails }: { knownEmails: string[] }) {
       description: String(form.get("description") ?? "").trim(),
       interval: intervalOpt.interval,
       intervalCount: intervalOpt.interval_count,
-      daysUntilDue: Number(form.get("daysUntilDue") ?? 14),
     };
     try {
       const res = await fetch("/api/admin/subscriptions", {
@@ -107,21 +114,22 @@ export function InvoiceForm({ knownEmails }: { knownEmails: string[] }) {
       });
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
-        subscriptionId?: string;
-        firstInvoiceHostedUrl?: string | null;
-        firstInvoicePdf?: string | null;
+        checkoutSessionId?: string;
+        checkoutUrl?: string;
+        emailSent?: boolean;
+        emailError?: string | null;
         error?: string;
       };
-      if (!res.ok || !data.ok || !data.subscriptionId) {
-        throw new Error(data.error ?? "Could not create subscription.");
+      if (!res.ok || !data.ok || !data.checkoutSessionId || !data.checkoutUrl) {
+        throw new Error(data.error ?? "Could not create subscription setup link.");
       }
       setStatus("success");
       setResult({
         kind: "subscription",
-        id: data.subscriptionId,
-        hostedInvoiceUrl: data.firstInvoiceHostedUrl ?? null,
-        invoicePdf: data.firstInvoicePdf ?? null,
-        sent: true,
+        id: data.checkoutSessionId,
+        checkoutUrl: data.checkoutUrl,
+        emailSent: !!data.emailSent,
+        emailError: data.emailError ?? null,
       });
       e.currentTarget.reset();
     } catch (err) {
@@ -213,32 +221,23 @@ export function InvoiceForm({ knownEmails }: { knownEmails: string[] }) {
       </div>
 
       {mode === "subscription" ? (
-        <div className="grid gap-6 md:grid-cols-2">
-          <div>
-            <label className={labelClass}>Billing cycle</label>
-            <select
-              name="intervalKey"
-              defaultValue="monthly"
-              className={`mt-2 ${inputClass}`}
-            >
-              {intervalOptions.map((o) => (
-                <option key={o.value} value={o.value} className="bg-zinc-900 text-white">
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className={labelClass}>Days until due (each cycle)</label>
-            <input
-              name="daysUntilDue"
-              type="number"
-              min={0}
-              max={365}
-              defaultValue={14}
-              className={`mt-2 ${inputClass}`}
-            />
-          </div>
+        <div>
+          <label className={labelClass}>Billing cycle</label>
+          <select
+            name="intervalKey"
+            defaultValue="monthly"
+            className={`mt-2 ${inputClass}`}
+          >
+            {intervalOptions.map((o) => (
+              <option key={o.value} value={o.value} className="bg-zinc-900 text-white">
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <p className="mt-2 text-xs text-zinc-500">
+            Customer gets emailed a one-time setup link to enter their card.
+            After that Stripe auto-charges every cycle.
+          </p>
         </div>
       ) : (
         <div className="grid gap-6 md:grid-cols-2">
@@ -269,36 +268,60 @@ export function InvoiceForm({ knownEmails }: { knownEmails: string[] }) {
 
       {status === "success" && result ? (
         <div className="rounded-md border border-emerald-400/40 bg-emerald-400/[0.08] px-4 py-3 text-sm text-emerald-100">
-          <p className="font-medium">
-            {result.kind === "invoice"
-              ? `Invoice ${result.sent ? "sent" : "finalized"} (${result.id}).`
-              : `Subscription created (${result.id}). First invoice emailed.`}
-          </p>
-          {result.hostedInvoiceUrl ? (
-            <p className="mt-1">
-              <a
-                href={result.hostedInvoiceUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="underline underline-offset-2 hover:text-white"
-              >
-                Open hosted invoice
-              </a>
-              {result.invoicePdf ? (
-                <>
-                  {" · "}
+          {result.kind === "invoice" ? (
+            <>
+              <p className="font-medium">
+                Invoice {result.sent ? "sent" : "finalized"} ({result.id}).
+              </p>
+              {result.hostedInvoiceUrl ? (
+                <p className="mt-1">
                   <a
-                    href={result.invoicePdf}
+                    href={result.hostedInvoiceUrl}
                     target="_blank"
                     rel="noreferrer"
                     className="underline underline-offset-2 hover:text-white"
                   >
-                    PDF
+                    Open hosted invoice
                   </a>
-                </>
+                  {result.invoicePdf ? (
+                    <>
+                      {" · "}
+                      <a
+                        href={result.invoicePdf}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline underline-offset-2 hover:text-white"
+                      >
+                        PDF
+                      </a>
+                    </>
+                  ) : null}
+                </p>
               ) : null}
-            </p>
-          ) : null}
+            </>
+          ) : (
+            <>
+              <p className="font-medium">
+                Setup link created.
+                {result.emailSent
+                  ? " Customer was emailed the link."
+                  : " Email failed — send the link manually below."}
+              </p>
+              {result.emailError ? (
+                <p className="mt-1 text-emerald-300/80">{result.emailError}</p>
+              ) : null}
+              <p className="mt-2 break-all">
+                <a
+                  href={result.checkoutUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline underline-offset-2 hover:text-white"
+                >
+                  {result.checkoutUrl}
+                </a>
+              </p>
+            </>
+          )}
         </div>
       ) : null}
 
