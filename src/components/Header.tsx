@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useRef } from "react";
+import { useState, useRef } from "react";
 import { motion, useMotionValueEvent, useScroll } from "framer-motion";
+import { UserButton, useAuth } from "@clerk/nextjs";
 
 export function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [visible, setVisible] = useState(true);
   const lastScrollRef = useRef(0);
   const { scrollY } = useScroll();
+  const { isLoaded, isSignedIn } = useAuth();
 
   useMotionValueEvent(scrollY, "change", (current) => {
     const diff = current - lastScrollRef.current;
@@ -54,6 +56,27 @@ export function Header() {
               Work
               <span className="absolute -bottom-1 left-0 h-px w-0 bg-white transition-all duration-300 group-hover:w-full" />
             </Link>
+            <Link
+              href="/contact"
+              className="group relative text-sm tracking-wider text-zinc-400 transition-colors hover:text-white"
+              data-cursor="pointer"
+            >
+              Contact
+              <span className="absolute -bottom-1 left-0 h-px w-0 bg-white transition-all duration-300 group-hover:w-full" />
+            </Link>
+            {isLoaded && !isSignedIn ? (
+              <Link
+                href="/sign-in"
+                className="group relative text-sm tracking-wider text-zinc-400 transition-colors hover:text-white"
+                data-cursor="pointer"
+              >
+                Sign in
+                <span className="absolute -bottom-1 left-0 h-px w-0 bg-white transition-all duration-300 group-hover:w-full" />
+              </Link>
+            ) : null}
+            {isLoaded && isSignedIn ? (
+              <UserButton appearance={{ variables: { colorPrimary: "#ffffff" } }} />
+            ) : null}
           </nav>
         </div>
       </div>

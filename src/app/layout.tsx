@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import { Syne, DM_Sans } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
+import { dark } from "@clerk/themes";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Header } from "@/components/Header";
 import { SmoothScroll } from "@/components/SmoothScroll";
 import { CustomCursor } from "@/components/CustomCursor";
@@ -29,16 +33,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body
-        className={`${syne.variable} ${dmSans.variable} noise-overlay min-h-screen bg-[#050505] text-white antialiased`}
-      >
-        <SmoothScroll />
-        <CustomCursor />
-        <Preloader />
-        <Header />
-        <main>{children}</main>
-      </body>
-    </html>
+    <ClerkProvider appearance={{ baseTheme: dark }}>
+      <html lang="en" className="dark">
+        <body
+          className={`${syne.variable} ${dmSans.variable} noise-overlay min-h-screen bg-[#050505] text-white antialiased`}
+        >
+          <SmoothScroll />
+          <CustomCursor />
+          <Preloader />
+          <Header />
+          <main>{children}</main>
+          <Analytics />
+          <SpeedInsights />
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
