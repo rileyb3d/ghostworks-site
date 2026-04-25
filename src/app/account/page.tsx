@@ -76,7 +76,7 @@ export default async function AccountPage() {
         </div>
         <div className="flex items-center gap-4">
           <ManageBillingButton />
-          <UserButton appearance={{ variables: { colorPrimary: "#ffffff" } }} />
+          <UserButton />
         </div>
       </header>
 

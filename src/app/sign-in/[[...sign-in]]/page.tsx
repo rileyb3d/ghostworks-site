@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function SignInPage() {
   return (
-    <div className="mx-auto flex min-h-[80vh] max-w-5xl flex-col items-center justify-center gap-10 px-6 pt-32 pb-16 lg:flex-row lg:items-start lg:gap-20">
+    <div className="mx-auto flex min-h-[80vh] max-w-5xl flex-col items-center justify-center gap-10 px-6 pt-32 pb-16 lg:flex-row lg:items-start lg:justify-between lg:gap-20">
       <div className="max-w-md text-center lg:text-left">
         <p className="font-display text-xs font-medium uppercase tracking-[0.4em] text-zinc-500">
           Client account
@@ -19,9 +19,8 @@ export default function SignInPage() {
         </p>
       </div>
       <SignIn
-        appearance={{ variables: { colorPrimary: "#ffffff" } }}
         signUpUrl="/sign-up"
-        forceRedirectUrl="/account"
+        fallbackRedirectUrl="/account"
       />
     </div>
   );

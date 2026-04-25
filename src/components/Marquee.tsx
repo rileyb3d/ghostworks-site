@@ -4,61 +4,37 @@ import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
 
 const words = [
-  "Ghostworks",
-  "Creative",
+  "Direction",
   "Production",
-  "Cinematic",
-  "Ghostworks",
-  "Creative",
-  "Production",
-  "Cinematic",
+  "Design",
+  "Brand",
+  "Film",
+  "Story",
 ];
 
 export function Marquee() {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-50px" });
+  const isInView = useInView(ref, { once: true, margin: "-80px" });
+  const looped = [...words, ...words, ...words, ...words];
 
   return (
-    <section ref={ref} className="overflow-hidden py-20 md:py-32">
+    <section ref={ref} className="overflow-hidden border-t border-white/[0.06] py-24">
       <motion.div
         initial={{ opacity: 0 }}
-        animate={isInView ? { opacity: 1 } : {}}
-        transition={{ duration: 1 }}
+        animate={isInView ? { opacity: 1 } : undefined}
+        transition={{ duration: 0.8 }}
       >
-        {/* Row 1 — right to left */}
-        <div className="mb-4 flex overflow-hidden whitespace-nowrap">
-          <div className="animate-scroll-left flex shrink-0">
-            {[...words, ...words].map((word, i) => (
-              <span
-                key={`a-${i}`}
-                className={`mx-4 font-display text-6xl font-bold md:mx-8 md:text-8xl lg:text-9xl ${
-                  i % 2 === 0
-                    ? "text-stroke"
-                    : "text-white/[0.03]"
-                }`}
-              >
-                {word}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Row 2 — left to right (reversed) */}
         <div className="flex overflow-hidden whitespace-nowrap">
-          <div
-            className="animate-scroll-left flex shrink-0"
-            style={{ animationDirection: "reverse", animationDuration: "50s" }}
-          >
-            {[...words, ...words].map((word, i) => (
+          <div className="animate-scroll-left flex shrink-0 items-center">
+            {looped.map((word, i) => (
               <span
-                key={`b-${i}`}
-                className={`mx-4 font-display text-6xl font-bold md:mx-8 md:text-8xl lg:text-9xl ${
-                  i % 2 === 1
-                    ? "text-stroke"
-                    : "text-white/[0.03]"
-                }`}
+                key={`m-${i}`}
+                className="mx-8 flex items-center gap-8 font-display text-5xl font-semibold tracking-tight md:text-7xl"
               >
-                {word}
+                <span className={i % 2 === 0 ? "text-white/90" : "text-stroke"}>
+                  {word}
+                </span>
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-white/30" />
               </span>
             ))}
           </div>

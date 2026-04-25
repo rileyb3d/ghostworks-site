@@ -6,8 +6,6 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Header } from "@/components/Header";
 import { SmoothScroll } from "@/components/SmoothScroll";
-import { CustomCursor } from "@/components/CustomCursor";
-import { Preloader } from "@/components/Preloader";
 import "./globals.css";
 
 const syne = Syne({
@@ -36,11 +34,9 @@ export default function RootLayout({
     <ClerkProvider appearance={{ baseTheme: dark }}>
       <html lang="en" className="dark">
         <body
-          className={`${syne.variable} ${dmSans.variable} noise-overlay min-h-screen bg-[#050505] text-white antialiased`}
+          className={`${syne.variable} ${dmSans.variable} min-h-screen bg-[#050505] text-white antialiased`}
         >
           <SmoothScroll />
-          <CustomCursor />
-          <Preloader />
           <Header />
           <main>{children}</main>
           <Analytics />

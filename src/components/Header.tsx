@@ -84,7 +84,7 @@ export function Header() {
                   Account
                   <span className="absolute -bottom-1 left-0 h-px w-0 bg-white transition-all duration-300 group-hover:w-full" />
                 </Link>
-                <UserButton appearance={{ variables: { colorPrimary: "#ffffff" } }} />
+                <UserButton />
               </>
             ) : null}
           </nav>

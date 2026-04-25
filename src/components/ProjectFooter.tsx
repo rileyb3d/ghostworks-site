@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
 import { getAllProjects } from "@/lib/projects";

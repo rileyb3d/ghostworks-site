@@ -10,18 +10,12 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
-      {/* Full-screen hero with video */}
-      <section className="relative">
-        <HeroReel project={featured} />
-      </section>
+      <HeroReel project={featured} />
 
-      {/* Section divider */}
       <SectionDivider label="Selected Work" count={allProjects.length} />
 
-      {/* Asymmetric project grid */}
       <ProjectGrid projects={rest} />
 
-      {/* Marquee */}
       <Marquee />
     </div>
   );
@@ -29,14 +23,12 @@ export default function Home() {
 
 function SectionDivider({ label, count }: { label: string; count: number }) {
   return (
-    <div className="mx-auto max-w-7xl px-8 pt-32 pb-16 lg:px-16">
-      <div className="flex items-end justify-between border-b border-white/[0.06] pb-8">
-        <div className="flex items-center gap-6">
-          <span className="font-display text-xs font-medium uppercase tracking-[0.4em] text-zinc-500">
-            {label}
-          </span>
-        </div>
-        <span className="hidden text-sm tabular-nums text-zinc-700 md:block">
+    <div className="mx-auto max-w-7xl px-8 pt-28 pb-12 lg:px-16">
+      <div className="flex items-end justify-between border-b border-white/[0.06] pb-6">
+        <span className="font-display text-xs font-medium uppercase tracking-[0.4em] text-zinc-500">
+          {label}
+        </span>
+        <span className="text-sm tabular-nums text-zinc-600">
           ({String(count).padStart(2, "0")})
         </span>
       </div>
