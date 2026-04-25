@@ -56,8 +56,9 @@ export default async function AccountPage() {
     subscriptions = data.subscriptions;
   } catch (err) {
     console.error("Failed to load billing data", err);
-    billingError =
-      "We couldn't reach Stripe right now. Refresh in a minute or contact support if it keeps happening.";
+    const detail =
+      err instanceof Error ? err.message : typeof err === "string" ? err : "Unknown error";
+    billingError = `Stripe error: ${detail}`;
   }
 
   return (
