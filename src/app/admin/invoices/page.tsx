@@ -82,6 +82,8 @@ export default async function AdminInvoicesPage() {
     loadStripeData(),
   ]);
 
+  const stats = computeStats(stripeData.invoices, stripeData.subscriptions);
+
   return (
     <div className="mx-auto max-w-6xl px-8 pt-32 pb-24 lg:px-16">
       <header className="border-b border-white/[0.06] pb-10">
@@ -96,6 +98,33 @@ export default async function AdminInvoicesPage() {
           Stripe customer if needed and email a hosted payment link.
         </p>
       </header>
+
+      <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Accounts receivable"
+          value={formatMoney(stats.accountsReceivable)}
+          hint={`${stats.openCount} open invoice${stats.openCount === 1 ? "" : "s"}`}
+          tone="amber"
+        />
+        <StatCard
+          label="Past due"
+          value={formatMoney(stats.pastDue)}
+          hint={`${stats.pastDueCount} overdue`}
+          tone={stats.pastDue > 0 ? "red" : "muted"}
+        />
+        <StatCard
+          label="Paid (lifetime)"
+          value={formatMoney(stats.paidLifetime)}
+          hint={`${stats.paidCount} invoice${stats.paidCount === 1 ? "" : "s"}`}
+          tone="emerald"
+        />
+        <StatCard
+          label="MRR"
+          value={formatMoney(stats.mrr)}
+          hint={`${stats.activeSubsCount} active subscription${stats.activeSubsCount === 1 ? "" : "s"}`}
+          tone="muted"
+        />
+      </div>
 
       <Section label="New billing">
         <InvoiceForm knownEmails={knownEmails} />
@@ -144,4 +173,141 @@ function Section({
       <div className="mt-6">{children}</div>
     </section>
   );
+}
+
+const TONE_BORDER: Record<"amber" | "red" | "emerald" | "muted", string> = {
+  amber: "border-amber-400/30",
+  red: "border-red-400/40",
+  emerald: "border-emerald-400/30",
+  muted: "border-white/[0.08]",
+};
+
+const TONE_VALUE: Record<"amber" | "red" | "emerald" | "muted", string> = {
+  amber: "text-amber-200",
+  red: "text-red-200",
+  emerald: "text-emerald-200",
+  muted: "text-white",
+};
+
+function StatCard({
+  label,
+  value,
+  hint,
+  tone,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  tone: "amber" | "red" | "emerald" | "muted";
+}) {
+  return (
+    <div
+      className={`rounded-md border bg-white/[0.02] px-5 py-4 ${TONE_BORDER[tone]}`}
+    >
+      <p className="font-display text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-400">
+        {label}
+      </p>
+      <p
+        className={`mt-2 font-display text-2xl font-semibold tabular-nums ${TONE_VALUE[tone]}`}
+      >
+        {value}
+      </p>
+      {hint ? <p className="mt-1 text-xs text-zinc-500">{hint}</p> : null}
+    </div>
+  );
+}
+
+function formatMoney(cents: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(cents / 100);
+}
+
+// Aggregate stats off the already-fetched lists, so we don't pay extra Stripe
+// API calls. Numbers reflect *all currencies normalized to USD numerically* —
+// since this codebase only issues USD billing, this is fine. If we ever bill
+// in EUR/GBP, switch to per-currency buckets.
+function computeStats(
+  invoices: Stripe.Invoice[],
+  subscriptions: Stripe.Subscription[],
+): {
+  accountsReceivable: number;
+  openCount: number;
+  pastDue: number;
+  pastDueCount: number;
+  paidLifetime: number;
+  paidCount: number;
+  mrr: number;
+  activeSubsCount: number;
+} {
+  let accountsReceivable = 0;
+  let openCount = 0;
+  let pastDue = 0;
+  let pastDueCount = 0;
+  let paidLifetime = 0;
+  let paidCount = 0;
+
+  const now = Math.floor(Date.now() / 1000);
+
+  for (const inv of invoices) {
+    if (inv.status === "open" || inv.status === "uncollectible") {
+      accountsReceivable += inv.amount_remaining ?? inv.total ?? 0;
+      openCount += 1;
+      if (inv.due_date && inv.due_date < now) {
+        pastDue += inv.amount_remaining ?? inv.total ?? 0;
+        pastDueCount += 1;
+      }
+    } else if (inv.status === "paid") {
+      paidLifetime += inv.amount_paid ?? inv.total ?? 0;
+      paidCount += 1;
+    }
+  }
+
+  let mrr = 0;
+  let activeSubsCount = 0;
+  for (const sub of subscriptions) {
+    if (sub.status !== "active" && sub.status !== "trialing") continue;
+    activeSubsCount += 1;
+    for (const item of sub.items.data) {
+      const price = item.price;
+      if (!price.recurring || price.unit_amount == null) continue;
+      const qty = item.quantity ?? 1;
+      const cycle = price.recurring;
+      const monthly = toMonthlyCents(
+        price.unit_amount * qty,
+        cycle.interval,
+        cycle.interval_count,
+      );
+      mrr += monthly;
+    }
+  }
+
+  return {
+    accountsReceivable,
+    openCount,
+    pastDue,
+    pastDueCount,
+    paidLifetime,
+    paidCount,
+    mrr: Math.round(mrr),
+    activeSubsCount,
+  };
+}
+
+function toMonthlyCents(
+  perCycle: number,
+  interval: "day" | "week" | "month" | "year",
+  intervalCount: number,
+): number {
+  switch (interval) {
+    case "day":
+      return (perCycle * 30) / intervalCount;
+    case "week":
+      return (perCycle * (52 / 12)) / intervalCount;
+    case "month":
+      return perCycle / intervalCount;
+    case "year":
+      return perCycle / (12 * intervalCount);
+  }
 }
