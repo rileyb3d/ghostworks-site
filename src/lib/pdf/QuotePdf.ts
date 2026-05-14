@@ -48,13 +48,30 @@ function readSignature(file: string): Buffer | undefined {
 type GhostworksSigner = {
   name: string;
   signature?: Buffer;
+  // Per-signer tweaks so each scanned signature reads at a comparable
+  // visual weight on the page. `heightScale` multiplies the default
+  // signature height; `baselineOffset` shifts the image down (positive)
+  // or up (negative) in PDF points relative to the signature line.
+  heightScale?: number;
+  baselineOffset?: number;
 };
 
 // People authorized to sign quotes on behalf of the studio. Both names
-// get a signature line on every PDF, pre-signed and pre-dated.
+// get a signature line on every PDF, pre-signed and pre-dated. Mike's
+// scan has more vertical whitespace inside the ink (dots, light
+// descenders) so we bump its size and drop it slightly so it sits on
+// the line with the same weight as Riley's.
 const GHOSTWORKS_SIGNERS: readonly GhostworksSigner[] = [
-  { name: "Michael Ridolfi", signature: readSignature("michael.png") },
-  { name: "Riley Brown", signature: readSignature("riley.png") },
+  {
+    name: "Michael Ridolfi",
+    signature: readSignature("michael.png"),
+    heightScale: 1.35,
+    baselineOffset: 6,
+  },
+  {
+    name: "Riley Brown",
+    signature: readSignature("riley.png"),
+  },
 ];
 
 const PAGE = {
@@ -529,6 +546,8 @@ function drawSignatures(
       {
         fixedName: signer.name,
         signatureImage: signer.signature,
+        signatureHeightScale: signer.heightScale,
+        signatureBaselineOffset: signer.baselineOffset,
         fixedDate: issuedDate,
         rowHeight: ROW_HEIGHT,
       },
@@ -559,6 +578,8 @@ function drawSignerBlock(
   opts: {
     fixedName?: string;
     signatureImage?: Buffer;
+    signatureHeightScale?: number;
+    signatureBaselineOffset?: number;
     fixedDate?: string;
     rowHeight: number;
   },
@@ -570,14 +591,16 @@ function drawSignerBlock(
   const sigLineY = y + 20;
   drawHRule(doc, x, sigLineY, x + width);
   if (opts.fixedName) {
-    // Pre-rendered signature scan resting on the line. We constrain by
-    // height so signatures with different aspect ratios all sit at the
-    // same visual height; the source PNGs are already trimmed to ink
-    // and have a transparent background, so they composite cleanly over
-    // the signature line below.
+    // Pre-rendered signature scan resting on the line. Source PNGs are
+    // trimmed to ink with transparent backgrounds, so they composite
+    // cleanly over the line. Per-signer scale and baseline tweaks let
+    // each scribble sit at the same visual weight even when the
+    // underlying bounding boxes differ.
+    const baseHeight = 36;
+    const sigHeight = baseHeight * (opts.signatureHeightScale ?? 1);
+    const baselineOffset = opts.signatureBaselineOffset ?? 0;
     if (opts.signatureImage) {
-      const sigHeight = 36;
-      const sigY = sigLineY - sigHeight + 4;
+      const sigY = sigLineY - sigHeight + 4 + baselineOffset;
       try {
         doc.image(opts.signatureImage, x + 6, sigY, { height: sigHeight });
       } catch {
@@ -585,6 +608,9 @@ function drawSignerBlock(
         // still identifies who signed.
       }
     }
+    // Printed name sits at the same Y for both signers so the two
+    // labels line up across the column. Light overlap with the bottom
+    // of a scaled-down signature is OK — they're thin descender strokes.
     doc
       .fillColor(TEXT_DARK)
       .font("Helvetica")
