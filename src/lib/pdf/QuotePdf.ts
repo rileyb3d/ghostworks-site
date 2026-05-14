@@ -15,15 +15,21 @@ export type StudioInfo = {
   website?: string;
 };
 
+// Studio metadata is hardcoded here — it's company facts, not config.
+// Update this block to change how the studio appears on every quote PDF.
 export function defaultStudio(): StudioInfo {
   return {
     name: "Ghostworks",
     tagline: "Creative studio",
     addressLines: [],
-    email: process.env.CONTACT_FROM_EMAIL ?? "hello@ghostworks3d.com",
+    email: "admin@ghostworks3d.com",
     website: process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, ""),
   };
 }
+
+// People authorized to sign quotes on behalf of the studio. Both names
+// get a signature line on every PDF.
+const GHOSTWORKS_SIGNERS = ["Michael Ridolfi", "Riley Brown"] as const;
 
 const PAGE = {
   size: "LETTER" as const,
@@ -75,6 +81,7 @@ export async function renderQuotePdf(quote: Quote): Promise<Buffer> {
       drawQuotePage(doc, quote, studio);
       doc.addPage({ size: PAGE.size, margin: PAGE.margin });
       drawTermsPage(doc, quote);
+      drawSignatures(doc, quote);
 
       // pdfkit doesn't natively repeat headers/footers, so we walk every
       // page after rendering and add the footer band.
@@ -430,6 +437,113 @@ function drawTermsPage(doc: PDFKit.PDFDocument, quote: Quote) {
       .text(t.body, { width: pageWidth(doc), lineGap: 2 });
     doc.moveDown(0.8);
   }
+}
+
+function drawSignatures(doc: PDFKit.PDFDocument, quote: Quote) {
+  // Reserve enough room for the heading + two stacked signature lines on
+  // the Ghostworks side. If we don't have it, push to a fresh page so the
+  // block never splits across page boundaries.
+  const NEEDED = 220;
+  const bottomLimit = doc.page.height - doc.page.margins.bottom - 36;
+  if (bottomLimit - doc.y < NEEDED) {
+    doc.addPage({ size: PAGE.size, margin: PAGE.margin });
+  } else {
+    doc.moveDown(1.5);
+  }
+
+  const labelY = doc.y;
+  doc
+    .fillColor(TEXT_MUTED)
+    .font("Helvetica-Bold")
+    .fontSize(7)
+    .text("ACCEPTED AND AGREED", leftX(doc), labelY, { characterSpacing: 1.2 });
+
+  const blockTop = labelY + 22;
+  const colGap = 32;
+  const colW = (pageWidth(doc) - colGap) / 2;
+  const leftCol = leftX(doc);
+  const rightCol = leftCol + colW + colGap;
+
+  doc
+    .fillColor("#000")
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text("For Ghostworks", leftCol, blockTop, { width: colW });
+
+  const clientLabel = quote.client.business ?? quote.client.name;
+  doc
+    .fillColor("#000")
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text(`For ${clientLabel}`, rightCol, blockTop, { width: colW });
+
+  // Ghostworks signers stack vertically; client gets a single block
+  // aligned to the top of the right column.
+  const ROW_HEIGHT = 70;
+  GHOSTWORKS_SIGNERS.forEach((name, idx) => {
+    drawSignerBlock(
+      doc,
+      leftCol,
+      blockTop + 22 + idx * ROW_HEIGHT,
+      colW,
+      { fixedName: name },
+    );
+  });
+  drawSignerBlock(doc, rightCol, blockTop + 22, colW, {
+    printNamePlaceholder: true,
+  });
+
+  // Leave the caret after the longer of the two columns so anything we
+  // add later (we don't, currently) doesn't collide.
+  doc.y = blockTop + 22 + GHOSTWORKS_SIGNERS.length * ROW_HEIGHT;
+}
+
+function drawSignerBlock(
+  doc: PDFKit.PDFDocument,
+  x: number,
+  y: number,
+  width: number,
+  opts: { fixedName?: string; printNamePlaceholder?: boolean },
+) {
+  const sigLineY = y + 24;
+  doc
+    .save()
+    .moveTo(x, sigLineY)
+    .lineTo(x + width, sigLineY)
+    .lineWidth(0.5)
+    .strokeColor("#000")
+    .stroke()
+    .restore();
+
+  if (opts.fixedName) {
+    doc
+      .fillColor(TEXT_DARK)
+      .font("Helvetica")
+      .fontSize(9)
+      .text(opts.fixedName, x, sigLineY + 4, { width });
+  } else if (opts.printNamePlaceholder) {
+    doc
+      .fillColor(TEXT_MUTED)
+      .font("Helvetica")
+      .fontSize(8)
+      .text("Print name", x, sigLineY + 4, { width });
+  }
+
+  const dateLineY = sigLineY + 26;
+  const dateWidth = width * 0.5;
+  doc
+    .save()
+    .moveTo(x, dateLineY)
+    .lineTo(x + dateWidth, dateLineY)
+    .lineWidth(0.5)
+    .strokeColor("#000")
+    .stroke()
+    .restore();
+  doc
+    .fillColor(TEXT_MUTED)
+    .font("Helvetica")
+    .fontSize(8)
+    .text("Date", x, dateLineY + 4, { width: dateWidth });
 }
 
 function drawFooter(

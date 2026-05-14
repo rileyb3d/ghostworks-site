@@ -3,7 +3,7 @@
 // We version the string so a quote PDF can reference which terms applied
 // at the time it was issued.
 
-export const QUOTE_TERMS_VERSION = "2026.05";
+export const QUOTE_TERMS_VERSION = "2026.05.b";
 
 export const QUOTE_TERMS = [
   {
@@ -36,6 +36,6 @@ export const QUOTE_TERMS = [
   },
   {
     heading: "Acceptance",
-    body: "To accept this quote, reply confirming you'd like to proceed. The first invoice will follow. Acceptance constitutes agreement to the terms above.",
+    body: "To accept this quote, sign and return the signature block that follows. The first invoice will follow. Signing constitutes agreement to the terms above.",
   },
 ];
