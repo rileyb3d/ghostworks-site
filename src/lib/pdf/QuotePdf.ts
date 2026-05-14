@@ -8,8 +8,11 @@ import { QUOTE_TERMS } from "@/lib/quote-terms";
 // PDF prints cleanly anywhere.
 
 export type StudioInfo = {
+  // Legal entity name. Appears in the From block, the signature block,
+  // and the footer. The big "GHOSTWORKS" wordmark at the top of the
+  // PDF is hardcoded separately — that's the brand mark, not the legal
+  // name.
   name: string;
-  tagline: string;
   addressLines: string[];
   email: string;
   website?: string;
@@ -19,8 +22,7 @@ export type StudioInfo = {
 // Update this block to change how the studio appears on every quote PDF.
 export function defaultStudio(): StudioInfo {
   return {
-    name: "Ghostworks",
-    tagline: "Creative studio",
+    name: "GHOSTWORKS MEDIA LLC",
     addressLines: [],
     email: "admin@ghostworks3d.com",
     website: process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, ""),
@@ -81,7 +83,7 @@ export async function renderQuotePdf(quote: Quote): Promise<Buffer> {
       drawQuotePage(doc, quote, studio);
       doc.addPage({ size: PAGE.size, margin: PAGE.margin });
       drawTermsPage(doc, quote);
-      drawSignatures(doc, quote);
+      drawSignatures(doc, quote, studio);
 
       // pdfkit doesn't natively repeat headers/footers, so we walk every
       // page after rendering and add the footer band.
@@ -160,18 +162,15 @@ function drawQuotePage(
 ) {
   doc.fillColor(TEXT_DARK);
 
-  // Header row: wordmark left, meta block right.
+  // Header row: wordmark left, meta block right. Wordmark is the brand,
+  // not the legal name — keep it as "GHOSTWORKS" no matter what
+  // studio.name is.
   const topY = doc.y;
   doc
     .font("Helvetica-Bold")
     .fontSize(18)
     .fillColor("#000")
     .text("GHOSTWORKS", leftX(doc), topY, { characterSpacing: 4 });
-  doc
-    .font("Helvetica")
-    .fontSize(10)
-    .fillColor(TEXT_MUTED)
-    .text(studio.tagline, leftX(doc), doc.y + 4);
 
   // Right-aligned meta block, positioned by absolute y.
   const metaStartY = topY;
@@ -439,7 +438,11 @@ function drawTermsPage(doc: PDFKit.PDFDocument, quote: Quote) {
   }
 }
 
-function drawSignatures(doc: PDFKit.PDFDocument, quote: Quote) {
+function drawSignatures(
+  doc: PDFKit.PDFDocument,
+  quote: Quote,
+  studio: StudioInfo,
+) {
   // Reserve enough room for the heading + two stacked signature lines on
   // the Ghostworks side. If we don't have it, push to a fresh page so the
   // block never splits across page boundaries.
@@ -468,7 +471,7 @@ function drawSignatures(doc: PDFKit.PDFDocument, quote: Quote) {
     .fillColor("#000")
     .font("Helvetica-Bold")
     .fontSize(10)
-    .text("For Ghostworks", leftCol, blockTop, { width: colW });
+    .text(`For ${studio.name}`, leftCol, blockTop, { width: colW });
 
   const clientLabel = quote.client.business ?? quote.client.name;
   doc
