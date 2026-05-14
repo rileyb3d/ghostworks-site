@@ -459,7 +459,10 @@ function drawSignatures(
     .fillColor(TEXT_MUTED)
     .font("Helvetica-Bold")
     .fontSize(7)
-    .text("ACCEPTED AND AGREED", leftX(doc), labelY, { characterSpacing: 1.2 });
+    .text("ACCEPTED AND AGREED", leftX(doc), labelY, {
+      characterSpacing: 1.2,
+      lineBreak: false,
+    });
 
   const blockTop = labelY + 22;
   const colGap = 32;
@@ -471,82 +474,126 @@ function drawSignatures(
     .fillColor("#000")
     .font("Helvetica-Bold")
     .fontSize(10)
-    .text(`For ${studio.name}`, leftCol, blockTop, { width: colW });
+    .text(`For ${studio.name}`, leftCol, blockTop, {
+      width: colW,
+      lineBreak: false,
+    });
 
   const clientLabel = quote.client.business ?? quote.client.name;
   doc
     .fillColor("#000")
     .font("Helvetica-Bold")
     .fontSize(10)
-    .text(`For ${clientLabel}`, rightCol, blockTop, { width: colW });
+    .text(`For ${clientLabel}`, rightCol, blockTop, {
+      width: colW,
+      lineBreak: false,
+    });
 
-  // Ghostworks signers stack vertically; client gets a single block
-  // aligned to the top of the right column.
-  const ROW_HEIGHT = 70;
+  // Each signer occupies a fixed "block" — Ghostworks signers are 2 rows
+  // (signature + date) and the client signer is 3 rows (signature + print
+  // name + date). Using the same ROW_HEIGHT lets the date lines line up
+  // across columns even though the client block is taller.
+  const ROW_HEIGHT = 38;
+  const blockHeight2Row = ROW_HEIGHT * 2;
   GHOSTWORKS_SIGNERS.forEach((name, idx) => {
     drawSignerBlock(
       doc,
       leftCol,
-      blockTop + 22 + idx * ROW_HEIGHT,
+      blockTop + 24 + idx * blockHeight2Row,
       colW,
-      { fixedName: name },
+      { fixedName: name, rowHeight: ROW_HEIGHT },
     );
   });
-  drawSignerBlock(doc, rightCol, blockTop + 22, colW, {
-    printNamePlaceholder: true,
+  drawSignerBlock(doc, rightCol, blockTop + 24, colW, {
+    rowHeight: ROW_HEIGHT,
   });
 
-  // Leave the caret after the longer of the two columns so anything we
-  // add later (we don't, currently) doesn't collide.
-  doc.y = blockTop + 22 + GHOSTWORKS_SIGNERS.length * ROW_HEIGHT;
+  const ghostworksHeight = GHOSTWORKS_SIGNERS.length * blockHeight2Row;
+  const clientHeight = ROW_HEIGHT * 3;
+  doc.y = blockTop + 24 + Math.max(ghostworksHeight, clientHeight);
 }
 
+// Render one signer's lines. Layout (top to bottom):
+//   [signature line]   "Michael Ridolfi" (fixed) or "Signature" (label)
+//   [print-name line]  "Print name"               (CLIENT ONLY)
+//   [date line]        "Date"
 function drawSignerBlock(
   doc: PDFKit.PDFDocument,
   x: number,
   y: number,
   width: number,
-  opts: { fixedName?: string; printNamePlaceholder?: boolean },
+  opts: { fixedName?: string; rowHeight: number },
 ) {
-  const sigLineY = y + 24;
-  doc
-    .save()
-    .moveTo(x, sigLineY)
-    .lineTo(x + width, sigLineY)
-    .lineWidth(0.5)
-    .strokeColor("#000")
-    .stroke()
-    .restore();
+  const r = opts.rowHeight;
+  const labelGap = 4;
 
+  // Row 1: signature line.
+  const sigLineY = y + 20;
+  drawHRule(doc, x, sigLineY, x + width);
   if (opts.fixedName) {
     doc
       .fillColor(TEXT_DARK)
       .font("Helvetica")
       .fontSize(9)
-      .text(opts.fixedName, x, sigLineY + 4, { width });
-  } else if (opts.printNamePlaceholder) {
+      .text(opts.fixedName, x, sigLineY + labelGap, {
+        width,
+        lineBreak: false,
+      });
+  } else {
     doc
       .fillColor(TEXT_MUTED)
       .font("Helvetica")
       .fontSize(8)
-      .text("Print name", x, sigLineY + 4, { width });
+      .text("Signature", x, sigLineY + labelGap, {
+        width,
+        lineBreak: false,
+      });
   }
 
-  const dateLineY = sigLineY + 26;
+  // Row 2 (client only): print-name line.
+  let rowsUsed = 1;
+  if (!opts.fixedName) {
+    const printLineY = y + r + 20;
+    drawHRule(doc, x, printLineY, x + width);
+    doc
+      .fillColor(TEXT_MUTED)
+      .font("Helvetica")
+      .fontSize(8)
+      .text("Print name", x, printLineY + labelGap, {
+        width,
+        lineBreak: false,
+      });
+    rowsUsed = 2;
+  }
+
+  // Final row: date (half width).
+  const dateLineY = y + r * rowsUsed + 20;
   const dateWidth = width * 0.5;
-  doc
-    .save()
-    .moveTo(x, dateLineY)
-    .lineTo(x + dateWidth, dateLineY)
-    .lineWidth(0.5)
-    .strokeColor("#000")
-    .stroke()
-    .restore();
+  drawHRule(doc, x, dateLineY, x + dateWidth);
   doc
     .fillColor(TEXT_MUTED)
     .font("Helvetica")
     .fontSize(8)
-    .text("Date", x, dateLineY + 4, { width: dateWidth });
+    .text("Date", x, dateLineY + labelGap, {
+      width: dateWidth,
+      lineBreak: false,
+    });
+}
+
+function drawHRule(
+  doc: PDFKit.PDFDocument,
+  x1: number,
+  y: number,
+  x2: number,
+) {
+  doc
+    .save()
+    .moveTo(x1, y)
+    .lineTo(x2, y)
+    .lineWidth(0.5)
+    .strokeColor("#000")
+    .stroke()
+    .restore();
 }
 
 function drawFooter(
@@ -556,6 +603,12 @@ function drawFooter(
   page: number,
   total: number,
 ) {
+  // The footer text is drawn BELOW the page's bottom margin (in the
+  // header/footer "zone"). Pdfkit's text() flushes the page when the
+  // draw target is past the bottom margin — even with lineBreak:false —
+  // which produced 2-3 phantom blank pages at the end. The canonical
+  // workaround is to temporarily zero out the bottom margin so the
+  // text() flow check stays satisfied, then restore it.
   const y = doc.page.height - doc.page.margins.bottom + 18;
   doc
     .save()
@@ -565,20 +618,29 @@ function drawFooter(
     .strokeColor(TEXT_RULE)
     .stroke()
     .restore();
-  doc
-    .fillColor(TEXT_FAINT)
-    .font("Helvetica")
-    .fontSize(8);
-  doc.text(`${studio.name} · ${studio.email}`, leftX(doc), y + 6, {
-    width: pageWidth(doc) / 2,
-  });
-  doc.text(
-    `${quote.number} · Page ${page} / ${total}`,
-    leftX(doc),
-    y + 6,
-    {
-      width: pageWidth(doc),
-      align: "right",
-    },
-  );
+
+  const restoreMargin = doc.page.margins.bottom;
+  doc.page.margins.bottom = 0;
+  try {
+    doc
+      .fillColor(TEXT_FAINT)
+      .font("Helvetica")
+      .fontSize(8);
+    doc.text(`${studio.name} · ${studio.email}`, leftX(doc), y + 6, {
+      width: pageWidth(doc) / 2,
+      lineBreak: false,
+    });
+    doc.text(
+      `${quote.number} · Page ${page} / ${total}`,
+      leftX(doc),
+      y + 6,
+      {
+        width: pageWidth(doc),
+        align: "right",
+        lineBreak: false,
+      },
+    );
+  } finally {
+    doc.page.margins.bottom = restoreMargin;
+  }
 }
