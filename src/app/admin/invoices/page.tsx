@@ -3,6 +3,7 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 import type Stripe from "stripe";
 import { isCurrentUserAdmin } from "@/lib/admin";
 import { getStripe } from "@/lib/stripe";
+import { AdminNav } from "@/components/admin/AdminNav";
 import { InvoiceForm } from "@/components/admin/InvoiceForm";
 import { InvoicesTable } from "@/components/admin/InvoicesTable";
 import { SubscriptionsTable } from "@/components/admin/SubscriptionsTable";
@@ -92,6 +93,7 @@ export default async function AdminInvoicesPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-8 pt-32 pb-24 lg:px-16">
+      <AdminNav />
       <header className="border-b border-white/[0.06] pb-10">
         <p className="font-display text-xs font-medium uppercase tracking-[0.4em] text-zinc-400">
           Admin

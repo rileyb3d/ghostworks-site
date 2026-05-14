@@ -1,12 +1,21 @@
 import { redirect } from "next/navigation";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
 import { UserButton } from "@clerk/nextjs";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { getOrCreateStripeCustomerId } from "@/lib/stripe-customer";
+import { getConnectStatus } from "@/lib/contractor";
+import {
+  readPrivateMeta,
+  readPublicMeta,
+} from "@/lib/users";
+import type { ContractorInvoice } from "@/lib/users";
 import { InvoicesList } from "@/components/account/InvoicesList";
 import { SubscriptionsList } from "@/components/account/SubscriptionsList";
 import { ManageBillingButton } from "@/components/account/ManageBillingButton";
+import { ContractorOnboarding } from "@/components/account/ContractorOnboarding";
+import { ContractorInvoiceForm } from "@/components/account/ContractorInvoiceForm";
+import { ContractorInvoicesList } from "@/components/account/ContractorInvoicesList";
 
 export const metadata = {
   title: "Account — Ghostworks",
@@ -49,6 +58,16 @@ export default async function AccountPage() {
   const displayName = user?.firstName || user?.username || "there";
   const email = user?.primaryEmailAddress?.emailAddress;
 
+  // Pull the same Clerk user via the server client so we can read both
+  // public and private metadata. `currentUser()` is enough for display
+  // fields but doesn't carry private metadata.
+  const client = await clerkClient();
+  const fullUser = await client.users.getUser(userId);
+  const pub = readPublicMeta(fullUser);
+  const priv = readPrivateMeta(fullUser);
+  const isContractor = !!pub.isContractor;
+  const businessName = pub.businessName ?? null;
+
   let invoices: Stripe.Invoice[] = [];
   let subscriptions: Stripe.Subscription[] = [];
   let billingError: string | null = null;
@@ -65,18 +84,42 @@ export default async function AccountPage() {
     billingError = `Stripe error: ${detail}`;
   }
 
+  let connectStatus: Awaited<ReturnType<typeof getConnectStatus>> = null;
+  let connectError: string | null = null;
+  if (isContractor && priv.stripeConnectAccountId) {
+    try {
+      connectStatus = await getConnectStatus(userId);
+    } catch (err) {
+      console.error("Failed to load Connect status", err);
+      connectError =
+        err instanceof Error ? err.message : "Could not load payout status.";
+    }
+  }
+
+  const contractorInvoices: ContractorInvoice[] = priv.contractorInvoices ?? [];
+  const payoutsReady = !!connectStatus?.payoutsEnabled;
+
   return (
     <div className="mx-auto max-w-4xl px-8 pt-32 pb-24 lg:px-16">
       <header className="flex flex-col gap-6 border-b border-white/[0.06] pb-10 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="font-display text-xs font-medium uppercase tracking-[0.4em] text-zinc-500">
-            Client account
+            {isContractor ? "Contractor account" : "Client account"}
           </p>
           <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight md:text-5xl">
             Hi, {displayName}.
           </h1>
+          {businessName ? (
+            <p className="mt-2 text-sm text-zinc-300">{businessName}</p>
+          ) : null}
           {email ? (
-            <p className="mt-2 text-sm text-zinc-500">{email}</p>
+            <p className="mt-1 text-sm text-zinc-500">{email}</p>
+          ) : null}
+          {isContractor && pub.contractor?.role ? (
+            <p className="mt-1 text-sm text-zinc-500">
+              {pub.contractor.role}
+              {pub.contractor.country ? ` · ${pub.contractor.country}` : ""}
+            </p>
           ) : null}
         </div>
         <div className="flex items-center gap-4">
@@ -97,6 +140,44 @@ export default async function AccountPage() {
         <p className="mt-10 rounded-md border border-red-400/30 bg-red-400/[0.06] px-4 py-3 text-sm text-red-300">
           {billingError}
         </p>
+      ) : null}
+
+      {isContractor ? (
+        <>
+          <Section
+            label="Payout setup"
+            hint="Complete Stripe onboarding once. We pay approved invoices straight to your bank."
+          >
+            {connectError ? (
+              <p className="rounded-md border border-red-400/30 bg-red-400/[0.06] px-4 py-3 text-sm text-red-300">
+                {connectError}
+              </p>
+            ) : (
+              <ContractorOnboarding status={connectStatus} />
+            )}
+          </Section>
+
+          <Section
+            label="Submit an invoice"
+            hint="Send a timesheet or fixed-fee invoice to the studio. An admin will review and approve before payment."
+          >
+            <ContractorInvoiceForm
+              disabled={!payoutsReady}
+              disabledHint={
+                payoutsReady
+                  ? null
+                  : "Finish Stripe payout setup above before submitting invoices."
+              }
+            />
+          </Section>
+
+          <Section
+            label="Your submissions"
+            hint="Most recent first. Status updates when an admin reviews or pays."
+          >
+            <ContractorInvoicesList invoices={contractorInvoices} />
+          </Section>
+        </>
       ) : null}
 
       <Section
