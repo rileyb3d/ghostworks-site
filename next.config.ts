@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "imgur.com", pathname: "/**" },
     ],
   },
+  // Heavy, Node-only packages we don't want bundled by the build — they
+  // get `require()`'d at runtime in the server function instead. pdfkit
+  // ships fontkit + its own font data, which the bundler can't follow.
+  serverExternalPackages: ["pdfkit"],
 };
 
 export default nextConfig;
