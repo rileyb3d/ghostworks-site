@@ -572,12 +572,14 @@ function drawSignerBlock(
   if (opts.fixedName) {
     // Pre-rendered signature scan resting on the line. We constrain by
     // height so signatures with different aspect ratios all sit at the
-    // same visual height; the bottom of the image kisses the line.
+    // same visual height; the source PNGs are already trimmed to ink
+    // and have a transparent background, so they composite cleanly over
+    // the signature line below.
     if (opts.signatureImage) {
-      const sigHeight = 32;
-      const sigY = sigLineY - sigHeight + 2;
+      const sigHeight = 36;
+      const sigY = sigLineY - sigHeight + 4;
       try {
-        doc.image(opts.signatureImage, x + 8, sigY, { height: sigHeight });
+        doc.image(opts.signatureImage, x + 6, sigY, { height: sigHeight });
       } catch {
         // Bad image data — fall through, the printed name label below
         // still identifies who signed.
