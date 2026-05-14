@@ -66,7 +66,7 @@ const GHOSTWORKS_SIGNERS: readonly GhostworksSigner[] = [
     name: "Michael Ridolfi",
     signature: readSignature("michael.png"),
     heightScale: 1.35,
-    baselineOffset: 6,
+    baselineOffset: 16,
   },
   {
     name: "Riley Brown",
