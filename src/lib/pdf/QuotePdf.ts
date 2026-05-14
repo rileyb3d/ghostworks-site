@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import PDFDocument from "pdfkit";
 import type { Quote } from "@/lib/quotes";
 import { QUOTE_TERMS } from "@/lib/quote-terms";
@@ -29,9 +31,31 @@ export function defaultStudio(): StudioInfo {
   };
 }
 
+// Pre-rendered signatures for the studio's authorized signers. Read once
+// at module load — both files ship inside the function bundle via
+// `outputFileTracingIncludes` (see next.config.ts). If a file is missing
+// we silently fall back to no image, and the signature line just renders
+// empty. Better a blank line than a crash mid-PDF.
+const SIGNATURE_DIR = path.join(process.cwd(), "src", "lib", "pdf", "signatures");
+function readSignature(file: string): Buffer | undefined {
+  try {
+    return fs.readFileSync(path.join(SIGNATURE_DIR, file));
+  } catch {
+    return undefined;
+  }
+}
+
+type GhostworksSigner = {
+  name: string;
+  signature?: Buffer;
+};
+
 // People authorized to sign quotes on behalf of the studio. Both names
-// get a signature line on every PDF.
-const GHOSTWORKS_SIGNERS = ["Michael Ridolfi", "Riley Brown"] as const;
+// get a signature line on every PDF, pre-signed and pre-dated.
+const GHOSTWORKS_SIGNERS: readonly GhostworksSigner[] = [
+  { name: "Michael Ridolfi", signature: readSignature("michael.png") },
+  { name: "Riley Brown", signature: readSignature("riley.png") },
+];
 
 const PAGE = {
   size: "LETTER" as const,
@@ -495,13 +519,19 @@ function drawSignatures(
   // across columns even though the client block is taller.
   const ROW_HEIGHT = 38;
   const blockHeight2Row = ROW_HEIGHT * 2;
-  GHOSTWORKS_SIGNERS.forEach((name, idx) => {
+  const issuedDate = formatDate(quote.createdAt);
+  GHOSTWORKS_SIGNERS.forEach((signer, idx) => {
     drawSignerBlock(
       doc,
       leftCol,
       blockTop + 24 + idx * blockHeight2Row,
       colW,
-      { fixedName: name, rowHeight: ROW_HEIGHT },
+      {
+        fixedName: signer.name,
+        signatureImage: signer.signature,
+        fixedDate: issuedDate,
+        rowHeight: ROW_HEIGHT,
+      },
     );
   });
   drawSignerBlock(doc, rightCol, blockTop + 24, colW, {
@@ -516,13 +546,22 @@ function drawSignatures(
 // Render one signer's lines. Layout (top to bottom):
 //   [signature line]   "Michael Ridolfi" (fixed) or "Signature" (label)
 //   [print-name line]  "Print name"               (CLIENT ONLY)
-//   [date line]        "Date"
+//   [date line]        "Date" / pre-filled date
+//
+// For Ghostworks signers we additionally:
+//   - overlay a pre-rendered signature image on the signature line
+//   - write the issue date above the date line (instead of the label)
 function drawSignerBlock(
   doc: PDFKit.PDFDocument,
   x: number,
   y: number,
   width: number,
-  opts: { fixedName?: string; rowHeight: number },
+  opts: {
+    fixedName?: string;
+    signatureImage?: Buffer;
+    fixedDate?: string;
+    rowHeight: number;
+  },
 ) {
   const r = opts.rowHeight;
   const labelGap = 4;
@@ -531,6 +570,19 @@ function drawSignerBlock(
   const sigLineY = y + 20;
   drawHRule(doc, x, sigLineY, x + width);
   if (opts.fixedName) {
+    // Pre-rendered signature scan resting on the line. We constrain by
+    // height so signatures with different aspect ratios all sit at the
+    // same visual height; the bottom of the image kisses the line.
+    if (opts.signatureImage) {
+      const sigHeight = 32;
+      const sigY = sigLineY - sigHeight + 2;
+      try {
+        doc.image(opts.signatureImage, x + 8, sigY, { height: sigHeight });
+      } catch {
+        // Bad image data — fall through, the printed name label below
+        // still identifies who signed.
+      }
+    }
     doc
       .fillColor(TEXT_DARK)
       .font("Helvetica")
@@ -570,14 +622,25 @@ function drawSignerBlock(
   const dateLineY = y + r * rowsUsed + 20;
   const dateWidth = width * 0.5;
   drawHRule(doc, x, dateLineY, x + dateWidth);
-  doc
-    .fillColor(TEXT_MUTED)
-    .font("Helvetica")
-    .fontSize(8)
-    .text("Date", x, dateLineY + labelGap, {
-      width: dateWidth,
-      lineBreak: false,
-    });
+  if (opts.fixedName && opts.fixedDate) {
+    doc
+      .fillColor(TEXT_DARK)
+      .font("Helvetica")
+      .fontSize(10)
+      .text(opts.fixedDate, x + 2, dateLineY - 13, {
+        width: dateWidth - 2,
+        lineBreak: false,
+      });
+  } else {
+    doc
+      .fillColor(TEXT_MUTED)
+      .font("Helvetica")
+      .fontSize(8)
+      .text("Date", x, dateLineY + labelGap, {
+        width: dateWidth,
+        lineBreak: false,
+      });
+  }
 }
 
 function drawHRule(
